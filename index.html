@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Community Map Tool</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <style>
+    :root {
+      --bg: #eff1f2;
+      --panel: #fcfbf8;
+      --line: #d8d2c7;
+      --text: #1f2328;
+      --muted: #626b73;
+      --accent: #f0a52b;
+      --accent-2: #d9ebe1;
+      --brand-dark: #4f5b65;
+      --brand-dark-2: #62707b;
+      --brand-white: #f7f7f6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background: linear-gradient(180deg, #eef0f1 0%, #e4e6e8 100%);
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      padding: 14px;
+      border-right: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(79, 91, 101, 0.98) 0%, rgba(95, 107, 117, 0.98) 100%);
+      backdrop-filter: blur(10px);
+      overflow: auto;
+      color: var(--brand-white);
+    }
+
+    .map-wrap {
+      position: relative;
+      min-height: 100vh;
+    }
+
+    #map {
+      position: absolute;
+      inset: 0;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+
+    .intro {
+      margin: 0 0 20px;
+      color: rgba(255, 255, 255, 0.86);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .group {
+      margin-bottom: 18px;
+      padding: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.10);
+    }
+
+    .group h2 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+    label {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    input,
+    select,
+    button,
+    textarea {
+      width: 100%;
+      font: inherit;
+    }
+
+    input,
+    select {
+      margin-top: 6px;
+      padding: 8px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.96);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: var(--accent);
+      color: #2f3337;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 120ms ease, opacity 120ms ease;
+    }
+
+    button.secondary {
+      background: rgba(255, 255, 255, 0.14);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+      transform: none;
+    }
+
+    .actions {
+      display: grid;
+      gap: 10px;
+    }
+
+    .actions-inline {
+      margin-top: 10px;
+    }
+
+    .status {
+      min-height: 22px;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.86);
+    }
+
+    .small {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.72);
+      line-height: 1.45;
+    }
+
+    .bbox {
+      margin-top: 8px;
+      padding: 10px;
+      border-radius: 10px;
+      background: rgba(240, 165, 43, 0.14);
+      font-size: 12px;
+      line-height: 1.45;
+      color: #fff;
+      word-break: break-word;
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 10px;
+    }
+
+    .brand {
+      flex: 0 0 auto;
+      order: 2;
+    }
+
+    .brand img {
+      display: block;
+      width: 92px;
+      height: auto;
+    }
+
+    .hero {
+      min-width: 0;
+      flex: 1 1 auto;
+      order: 1;
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+    }
+
+    .search-wrap {
+      position: relative;
+    }
+
+    .suggestions {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      margin: 0;
+      padding: 6px;
+      list-style: none;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid #d8d2c7;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+      max-height: 220px;
+      overflow: auto;
+      display: none;
+    }
+
+    .suggestions.show {
+      display: block;
+    }
+
+    .suggestions button {
+      width: 100%;
+      text-align: left;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: transparent;
+      color: #1f2328;
+      font-weight: 500;
+    }
+
+    .suggestions button:hover {
+      background: #eef3f6;
+      transform: none;
+    }
+
+    @media (max-width: 980px) {
+      .app {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto minmax(60vh, 1fr);
+      }
+
+      .sidebar {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .map-wrap,
+      #map {
+        min-height: 70vh;
+        position: relative;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand-row">
+        <div class="brand">
+          <img src="./assets/scdc-logo.webp" alt="Scottish Community Development Centre" />
+        </div>
+        <div class="hero">
+          <h1>Download community maps</h1>
+          <p class="intro">
+            Pan and zoom to your area, press 'Use Current View', select your page size and Download.
+          </p>
+        </div>
+      </div>
+
+      <section class="group">
+        <h2>Search</h2>
+        <label class="search-wrap">
+          Find a place
+          <input id="searchQuery" type="text" value="" placeholder="Search for a town, place, or postcode" autocomplete="off" />
+          <ul id="suggestions" class="suggestions"></ul>
+        </label>
+        <div class="actions">
+          <button id="searchBtn" class="secondary" type="button">Search</button>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2>Area</h2>
+        <div class="actions">
+          <button id="resetRect" class="secondary" type="button">Use Current View</button>
+          <button id="fitRect" class="secondary" type="button">Zoom To Export Box</button>
+        </div>
+        <div class="row actions-inline">
+          <button id="nudgeIn" class="secondary" type="button">Frame In</button>
+          <button id="nudgeOut" class="secondary" type="button">Frame Out</button>
+        </div>
+        <div class="row">
+          <label>
+            Page Size
+            <select id="pageSize">
+              <option value="A1">A1</option>
+              <option value="A2">A2</option>
+              <option value="A3">A3</option>
+              <option value="A4">A4</option>
+              <option value="A5">A5</option>
+            </select>
+          </label>
+          <label>
+            Orientation
+            <select id="orientation">
+              <option value="landscape">Landscape</option>
+              <option value="portrait">Portrait</option>
+            </select>
+          </label>
+        </div>
+        <div id="bboxReadout" class="bbox"></div>
+      </section>
+
+      <section class="group">
+        <h2>Download</h2>
+        <div class="actions">
+          <button id="exportPdf" type="button">Download PDF</button>
+          <button id="exportPng" class="secondary" type="button">Download Image (PNG)</button>
+          <button id="exportGeojson" class="secondary" type="button">Download GeoJSON</button>
+        </div>
+        <div id="status" class="status"></div>
+      </section>
+    </aside>
+
+    <main class="map-wrap">
+      <div id="map"></div>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>
+    const PAGE_SIZES_MM = {
+      A1: [841, 594],
+      A2: [594, 420],
+      A3: [420, 297],
+      A4: [297, 210],
+      A5: [210, 148],
+    };
+
+    const STYLES = {
+      voyager: {
+        leaflet: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+        export: "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
+        attribution: "CARTO Voyager / OpenStreetMap contributors",
+      },
+      light_all: {
+        leaflet: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+        export: "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
+        attribution: "CARTO Positron / OpenStreetMap contributors",
+      },
+      dark_all: {
+        leaflet: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+        export: "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
+        attribution: "CARTO Dark Matter / OpenStreetMap contributors",
+      },
+    };
+
+    const TILE_SIZE = 512;
+    const DEFAULT_BOUNDS = L.latLngBounds(
+      [57.6842, -4.1925],
+      [57.7008, -4.1405]
+    );
+
+    const els = {
+      searchQuery: document.getElementById("searchQuery"),
+      searchBtn: document.getElementById("searchBtn"),
+      suggestions: document.getElementById("suggestions"),
+      pageSize: document.getElementById("pageSize"),
+      orientation: document.getElementById("orientation"),
+      resetRect: document.getElementById("resetRect"),
+      fitRect: document.getElementById("fitRect"),
+      nudgeIn: document.getElementById("nudgeIn"),
+      nudgeOut: document.getElementById("nudgeOut"),
+      exportPdf: document.getElementById("exportPdf"),
+      exportPng: document.getElementById("exportPng"),
+      exportGeojson: document.getElementById("exportGeojson"),
+      status: document.getElementById("status"),
+      bboxReadout: document.getElementById("bboxReadout"),
+    };
+
+    const map = L.map("map", {
+      zoomControl: true,
+      preferCanvas: true,
+    });
+
+    let tileLayer = null;
+    let exportRect = null;
+    let suggestionResults = [];
+    let searchAbortController = null;
+    let searchDebounce = null;
+
+    function setStatus(text, isError = false) {
+      els.status.textContent = text;
+      els.status.style.color = isError ? "#ffd7d7" : "rgba(255,255,255,0.86)";
+    }
+
+    function formatBounds(bounds) {
+      const sw = bounds.getSouthWest();
+      const ne = bounds.getNorthEast();
+      return [
+        `West: ${sw.lng.toFixed(5)}`,
+        `South: ${sw.lat.toFixed(5)}`,
+        `East: ${ne.lng.toFixed(5)}`,
+        `North: ${ne.lat.toFixed(5)}`,
+      ].join(" | ");
+    }
+
+    function updateReadout() {
+      const bounds = getSelectionBounds();
+      if (!bounds) {
+        els.bboxReadout.textContent = "";
+        return;
+      }
+      els.bboxReadout.textContent = formatBounds(bounds);
+    }
+
+    function getSelectionBounds() {
+      return exportRect ? exportRect.getBounds() : null;
+    }
+
+    function setSelection(bounds) {
+      if (!exportRect) {
+        exportRect = L.rectangle(bounds, {
+          color: "#b05f29",
+          weight: 2,
+          fillOpacity: 0.06,
+          interactive: false,
+        }).addTo(map);
+      } else {
+        exportRect.setBounds(bounds);
+      }
+      updateReadout();
+    }
+
+    function clearSuggestions() {
+      suggestionResults = [];
+      els.suggestions.innerHTML = "";
+      els.suggestions.classList.remove("show");
+    }
+
+    function renderSuggestions(results) {
+      suggestionResults = results;
+      if (!results.length) {
+        clearSuggestions();
+        return;
+      }
+      els.suggestions.innerHTML = "";
+      results.forEach((result, index) => {
+        const li = document.createElement("li");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = result.display_name;
+        button.addEventListener("click", () => {
+          chooseSuggestion(index);
+        });
+        li.appendChild(button);
+        els.suggestions.appendChild(li);
+      });
+      els.suggestions.classList.add("show");
+    }
+
+    function chooseSuggestion(index) {
+      const result = suggestionResults[index];
+      if (!result) return;
+      els.searchQuery.value = result.display_name;
+      clearSuggestions();
+      const bounds = L.latLngBounds(
+        [parseFloat(result.boundingbox[0]), parseFloat(result.boundingbox[2])],
+        [parseFloat(result.boundingbox[1]), parseFloat(result.boundingbox[3])]
+      );
+      map.fitBounds(bounds, { padding: [30, 30] });
+      setStatus(`Found: ${result.display_name}`);
+    }
+
+    function applyStyle(styleKey) {
+      if (tileLayer) map.removeLayer(tileLayer);
+      const cfg = STYLES[styleKey];
+      tileLayer = L.tileLayer(cfg.leaflet, {
+        subdomains: "abcd",
+        maxZoom: 20,
+        crossOrigin: true,
+        detectRetina: true,
+        attribution: cfg.attribution,
+      });
+      tileLayer.addTo(map);
+    }
+
+    function getPageAspectRatio() {
+      const size = PAGE_SIZES_MM[els.pageSize.value];
+      const dims = els.orientation.value === "landscape" ? size : [size[1], size[0]];
+      return dims[0] / dims[1];
+    }
+
+    function makeAspectBoundsFromView(bounds) {
+      const center = bounds.getCenter();
+      const aspect = getPageAspectRatio();
+      const west = bounds.getWest();
+      const east = bounds.getEast();
+      const south = bounds.getSouth();
+      const north = bounds.getNorth();
+      const lat = center.lat;
+      const cosLat = Math.cos((lat * Math.PI) / 180);
+      const viewWidthM = (east - west) * 111320 * cosLat;
+      const viewHeightM = (north - south) * 111320;
+
+      let rectWidthM = viewWidthM;
+      let rectHeightM = rectWidthM / aspect;
+      if (rectHeightM > viewHeightM) {
+        rectHeightM = viewHeightM;
+        rectWidthM = rectHeightM * aspect;
+      }
+
+      rectWidthM *= 0.94;
+      rectHeightM *= 0.94;
+
+      const dLon = rectWidthM / (111320 * cosLat);
+      const dLat = rectHeightM / 111320;
+      return L.latLngBounds(
+        [center.lat - dLat / 2, center.lng - dLon / 2],
+        [center.lat + dLat / 2, center.lng + dLon / 2]
+      );
+    }
+
+    function refreshSelectionFromView() {
+      setSelection(makeAspectBoundsFromView(map.getBounds()));
+    }
+
+    function scaleBounds(bounds, factor) {
+      const center = bounds.getCenter();
+      const lat = center.lat;
+      const cosLat = Math.max(Math.cos((lat * Math.PI) / 180), 0.00001);
+      const widthM = (bounds.getEast() - bounds.getWest()) * 111320 * cosLat;
+      const heightM = (bounds.getNorth() - bounds.getSouth()) * 111320;
+      const nextWidthM = widthM * factor;
+      const nextHeightM = heightM * factor;
+      const dLon = nextWidthM / (111320 * cosLat);
+      const dLat = nextHeightM / 111320;
+      return L.latLngBounds(
+        [center.lat - dLat / 2, center.lng - dLon / 2],
+        [center.lat + dLat / 2, center.lng + dLon / 2]
+      );
+    }
+
+    els.resetRect.addEventListener("click", () => {
+      refreshSelectionFromView();
+      setStatus("Export box reset to current view.");
+    });
+    els.fitRect.addEventListener("click", () => {
+      const bounds = getSelectionBounds();
+      if (bounds) map.fitBounds(bounds, { padding: [20, 20] });
+    });
+    els.nudgeIn.addEventListener("click", () => {
+      const bounds = getSelectionBounds() || makeAspectBoundsFromView(map.getBounds());
+      setSelection(scaleBounds(bounds, 0.97));
+      setStatus("Export box nudged in.");
+    });
+    els.nudgeOut.addEventListener("click", () => {
+      const bounds = getSelectionBounds() || makeAspectBoundsFromView(map.getBounds());
+      setSelection(scaleBounds(bounds, 1.03));
+      setStatus("Export box nudged out.");
+    });
+    els.pageSize.addEventListener("change", refreshSelectionFromView);
+    els.orientation.addEventListener("change", refreshSelectionFromView);
+
+    async function runSearch() {
+      const query = els.searchQuery.value.trim();
+      if (!query) return;
+      try {
+        els.searchBtn.disabled = true;
+        setStatus("Searching...");
+        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=gb&q=${encodeURIComponent(query)}`;
+        const response = await fetch(url, {
+          headers: {
+            "Accept": "application/json",
+          },
+        });
+        if (!response.ok) throw new Error(`Search failed: ${response.status}`);
+        const results = await response.json();
+        if (!results.length) {
+          setStatus("No results found.", true);
+          return;
+        }
+        suggestionResults = results;
+        chooseSuggestion(0);
+      } catch (error) {
+        console.error(error);
+        setStatus(`Search failed: ${error.message}`, true);
+      } finally {
+        els.searchBtn.disabled = false;
+      }
+    }
+
+    async function fetchSuggestions(query) {
+      if (searchAbortController) searchAbortController.abort();
+      searchAbortController = new AbortController();
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=gb&q=${encodeURIComponent(query)}`;
+      const response = await fetch(url, {
+        headers: { "Accept": "application/json" },
+        signal: searchAbortController.signal,
+      });
+      if (!response.ok) throw new Error(`Search failed: ${response.status}`);
+      return await response.json();
+    }
+
+    els.searchBtn.addEventListener("click", runSearch);
+    els.searchQuery.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        runSearch();
+      }
+      if (event.key === "Escape") {
+        clearSuggestions();
+      }
+    });
+    els.searchQuery.addEventListener("input", () => {
+      const query = els.searchQuery.value.trim();
+      clearTimeout(searchDebounce);
+      if (query.length < 3) {
+        clearSuggestions();
+        return;
+      }
+      searchDebounce = setTimeout(async () => {
+        try {
+          const results = await fetchSuggestions(query);
+          renderSuggestions(results);
+        } catch (error) {
+          if (error.name !== "AbortError") {
+            console.error(error);
+          }
+        }
+      }, 250);
+    });
+    document.addEventListener("click", (event) => {
+      if (!els.suggestions.contains(event.target) && event.target !== els.searchQuery) {
+        clearSuggestions();
+      }
+    });
+
+    function lonLatToPixel(lon, lat, zoom) {
+      const scale = TILE_SIZE * 2 ** zoom;
+      const x = ((lon + 180) / 360) * scale;
+      const latRad = (lat * Math.PI) / 180;
+      const y = ((1 - Math.asinh(Math.tan(latRad)) / Math.PI) / 2) * scale;
+      return { x, y };
+    }
+
+    function boundsToPixelBox(bounds, zoom) {
+      const west = bounds.getWest();
+      const east = bounds.getEast();
+      const south = bounds.getSouth();
+      const north = bounds.getNorth();
+      const nw = lonLatToPixel(west, north, zoom);
+      const se = lonLatToPixel(east, south, zoom);
+      return {
+        minX: nw.x,
+        minY: nw.y,
+        maxX: se.x,
+        maxY: se.y,
+      };
+    }
+
+    function getExportZoom() {
+      return Math.max(14, Math.min(17, map.getZoom()));
+    }
+
+    async function loadImage(url) {
+      const response = await fetch(url, { mode: "cors" });
+      if (!response.ok) throw new Error(`Tile request failed: ${response.status}`);
+      const blob = await response.blob();
+      return await createImageBitmap(blob);
+    }
+
+    async function renderMapCanvas(bounds) {
+      const zoom = getExportZoom();
+      const cfg = STYLES.voyager;
+      const box = boundsToPixelBox(bounds, zoom);
+      const tileMinX = Math.floor(box.minX / TILE_SIZE);
+      const tileMaxX = Math.floor(box.maxX / TILE_SIZE);
+      const tileMinY = Math.floor(box.minY / TILE_SIZE);
+      const tileMaxY = Math.floor(box.maxY / TILE_SIZE);
+
+      const stitchCanvas = document.createElement("canvas");
+      stitchCanvas.width = (tileMaxX - tileMinX + 1) * TILE_SIZE;
+      stitchCanvas.height = (tileMaxY - tileMinY + 1) * TILE_SIZE;
+      const stitchCtx = stitchCanvas.getContext("2d");
+
+      const jobs = [];
+      for (let ty = tileMinY; ty <= tileMaxY; ty += 1) {
+        for (let tx = tileMinX; tx <= tileMaxX; tx += 1) {
+          const url = cfg.export
+            .replace("{z}", zoom)
+            .replace("{x}", tx)
+            .replace("{y}", ty);
+          jobs.push(
+            loadImage(url).then((img) => {
+              stitchCtx.drawImage(
+                img,
+                (tx - tileMinX) * TILE_SIZE,
+                (ty - tileMinY) * TILE_SIZE,
+                TILE_SIZE,
+                TILE_SIZE
+              );
+            })
+          );
+        }
+      }
+      await Promise.all(jobs);
+
+      const cropCanvas = document.createElement("canvas");
+      cropCanvas.width = Math.round(box.maxX - box.minX);
+      cropCanvas.height = Math.round(box.maxY - box.minY);
+      const cropCtx = cropCanvas.getContext("2d");
+      cropCtx.filter = "saturate(1.28) contrast(1.22)";
+      cropCtx.drawImage(
+        stitchCanvas,
+        box.minX - tileMinX * TILE_SIZE,
+        box.minY - tileMinY * TILE_SIZE,
+        cropCanvas.width,
+        cropCanvas.height,
+        0,
+        0,
+        cropCanvas.width,
+        cropCanvas.height
+      );
+
+      return { canvas: cropCanvas, attribution: cfg.attribution };
+    }
+
+    function getPageDimensionsMm() {
+      const size = PAGE_SIZES_MM[els.pageSize.value];
+      if (els.orientation.value === "landscape") return size;
+      return [size[1], size[0]];
+    }
+
+    function makeScaleMeters(bounds) {
+      const lat = (bounds.getNorth() + bounds.getSouth()) / 2;
+      const widthMeters = (bounds.getEast() - bounds.getWest()) * 111320 * Math.cos((lat * Math.PI) / 180);
+      const steps = [100, 200, 250, 500, 1000, 2000, 5000];
+      return steps.filter((step) => step <= widthMeters * 0.22).pop() || 100;
+    }
+
+    function drawScaleOnCanvas(ctx, bounds, mapWpx, pageWpx, marginPx, barY, pxPerMm) {
+      const scaleMeters = makeScaleMeters(bounds);
+      const lat = (bounds.getNorth() + bounds.getSouth()) / 2;
+      const widthMeters = (bounds.getEast() - bounds.getWest()) * 111320 * Math.cos((lat * Math.PI) / 180);
+      const barW = mapWpx * (scaleMeters / widthMeters);
+      const x = marginPx;
+      const y = barY;
+      const segW = barW / 4;
+      const barH = Math.round(3 * pxPerMm);
+      const labelY = y + barH + Math.round(2.5 * pxPerMm);
+      for (let i = 0; i < 4; i += 1) {
+        ctx.fillStyle = i % 2 === 0 ? "#000" : "#fff";
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = Math.max(1, Math.round(0.25 * pxPerMm));
+        ctx.fillRect(x + i * segW, y, segW, barH);
+        ctx.strokeRect(x + i * segW, y, segW, barH);
+      }
+      ctx.fillStyle = "#1f2328";
+      ctx.font = `${Math.round(2.4 * pxPerMm)}px Helvetica, Arial, sans-serif`;
+      ctx.textBaseline = "alphabetic";
+      ctx.fillText("0", x, labelY);
+      ctx.textAlign = "center";
+      ctx.fillText(`${Math.round(scaleMeters / 2)} m`, x + barW / 2, labelY);
+      ctx.textAlign = "right";
+      ctx.fillText(`${Math.round(scaleMeters)} m`, x + barW, labelY);
+      ctx.textAlign = "start";
+    }
+
+    function drawNorthOnCanvas(ctx, pageWpx, marginPx, centerY, pxPerMm) {
+      const x = pageWpx - marginPx - Math.round(5 * pxPerMm);
+      const y = centerY;
+      const arrowHalfW = Math.round(1.4 * pxPerMm);
+      const arrowH = Math.round(3 * pxPerMm);
+      ctx.fillStyle = "#1f2328";
+      ctx.font = `bold ${Math.round(2.6 * pxPerMm)}px Helvetica, Arial, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText("N", x, y - Math.round(1.8 * pxPerMm));
+      ctx.beginPath();
+      ctx.moveTo(x, y - Math.round(1.1 * pxPerMm));
+      ctx.lineTo(x - arrowHalfW, y + arrowH);
+      ctx.lineTo(x + arrowHalfW, y + arrowH);
+      ctx.closePath();
+      ctx.fill();
+      ctx.textAlign = "start";
+    }
+
+    function stripHtml(html) {
+      const temp = document.createElement("div");
+      temp.innerHTML = html;
+      return (temp.textContent || temp.innerText || "").replace(/\s+/g, " ").trim();
+    }
+
+    async function buildPrintCanvas(bounds) {
+      const { canvas: mapCanvas, attribution } = await renderMapCanvas(bounds);
+      const [pageWmm, pageHmm] = getPageDimensionsMm();
+      const pxPerMm = 8;
+      const pageWpx = Math.round(pageWmm * pxPerMm);
+      const pageHpx = Math.round(pageHmm * pxPerMm);
+      const marginPx = Math.round(14 * pxPerMm);
+      const footerPx = Math.round(24 * pxPerMm);
+      const mapX = marginPx;
+      const mapY = marginPx;
+      const mapW = pageWpx - marginPx * 2;
+      const mapH = pageHpx - marginPx * 2 - footerPx;
+
+      const pageCanvas = document.createElement("canvas");
+      pageCanvas.width = pageWpx;
+      pageCanvas.height = pageHpx;
+      const ctx = pageCanvas.getContext("2d");
+
+      ctx.fillStyle = "#f4f0e9";
+      ctx.fillRect(0, 0, pageWpx, pageHpx);
+      ctx.fillStyle = "#fff";
+      ctx.strokeStyle = "#beb9b2";
+      ctx.lineWidth = 2;
+      ctx.fillRect(mapX, mapY, mapW, mapH);
+      ctx.strokeRect(mapX, mapY, mapW, mapH);
+
+      ctx.drawImage(mapCanvas, mapX, mapY, mapW, mapH);
+
+      const footerBandTop = mapY + mapH;
+      const scaleBarY = footerBandTop + Math.round(4 * pxPerMm);
+      const northCenterY = footerBandTop + Math.round(8.5 * pxPerMm);
+
+      drawScaleOnCanvas(ctx, bounds, mapW, pageWpx, marginPx, scaleBarY, pxPerMm);
+      drawNorthOnCanvas(ctx, pageWpx, marginPx, northCenterY, pxPerMm);
+
+      const footerDate = new Date().toLocaleDateString();
+      const footerAttribution = stripHtml(attribution);
+      ctx.fillStyle = "#5a5e64";
+      ctx.font = `${Math.round(2.2 * pxPerMm)}px Helvetica, Arial, sans-serif`;
+      ctx.textAlign = "start";
+      ctx.fillText(
+        `${footerAttribution} | ${footerDate}`,
+        marginPx,
+        pageHpx - Math.round(5 * pxPerMm)
+      );
+      ctx.textAlign = "right";
+      ctx.fillText(
+        "Created with maps.scdc.org.uk",
+        pageWpx - marginPx,
+        pageHpx - Math.round(5 * pxPerMm)
+      );
+      ctx.textAlign = "start";
+
+      return { pageCanvas, pageWmm, pageHmm };
+    }
+
+    async function exportPdf() {
+      try {
+        els.exportPdf.disabled = true;
+        setStatus("Rendering PDF...");
+        const bounds = getSelectionBounds() || makeAspectBoundsFromView(map.getBounds());
+        const { pageCanvas, pageWmm, pageHmm } = await buildPrintCanvas(bounds);
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({
+          orientation: els.orientation.value,
+          unit: "mm",
+          format: [pageWmm, pageHmm],
+          compress: true,
+        });
+        const imgData = pageCanvas.toDataURL("image/jpeg", 0.94);
+        pdf.addImage(imgData, "JPEG", 0, 0, pageWmm, pageHmm);
+        const fileTitle = "community_map";
+        pdf.save(`${fileTitle}_${els.pageSize.value.toLowerCase()}.pdf`);
+        setStatus("PDF exported.");
+      } catch (error) {
+        console.error(error);
+        setStatus(`PDF export failed: ${error.message}`, true);
+      } finally {
+        els.exportPdf.disabled = false;
+      }
+    }
+
+    async function exportPng() {
+      try {
+        els.exportPng.disabled = true;
+        setStatus("Rendering PNG...");
+        const bounds = getSelectionBounds() || makeAspectBoundsFromView(map.getBounds());
+        const { pageCanvas } = await buildPrintCanvas(bounds);
+        const fileTitle = "community_map";
+        const a = document.createElement("a");
+        a.href = pageCanvas.toDataURL("image/png");
+        a.download = `${fileTitle}_${els.pageSize.value.toLowerCase()}.png`;
+        a.click();
+        setStatus("PNG exported.");
+      } catch (error) {
+        console.error(error);
+        setStatus(`PNG export failed: ${error.message}`, true);
+      } finally {
+        els.exportPng.disabled = false;
+      }
+    }
+
+    function exportGeojson() {
+      const bounds = getSelectionBounds() || makeAspectBoundsFromView(map.getBounds());
+      const sw = bounds.getSouthWest();
+      const ne = bounds.getNorthEast();
+      const feature = {
+        type: "Feature",
+        properties: {
+          page_size: els.pageSize.value,
+          orientation: els.orientation.value,
+          style: "voyager",
+        },
+        geometry: {
+          type: "Polygon",
+          coordinates: [[
+            [sw.lng, sw.lat],
+            [ne.lng, sw.lat],
+            [ne.lng, ne.lat],
+            [sw.lng, ne.lat],
+            [sw.lng, sw.lat],
+          ]],
+        },
+      };
+      const blob = new Blob([JSON.stringify(feature, null, 2)], { type: "application/geo+json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const fileTitle = "community_map";
+      a.href = url;
+      a.download = `${fileTitle}_selection.geojson`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setStatus("GeoJSON exported.");
+    }
+
+    els.exportPdf.addEventListener("click", exportPdf);
+    els.exportPng.addEventListener("click", exportPng);
+    els.exportGeojson.addEventListener("click", exportGeojson);
+
+    applyStyle("voyager");
+    map.fitBounds(L.latLngBounds([[54.5, -8.5], [59.5, -0.5]]), { padding: [10, 10] });
+    updateReadout();
+    setStatus("Ready.");
+  </script>
+</body>
+</html>
